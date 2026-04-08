@@ -2,3 +2,5 @@
 .env
 data/*.faiss
 data/records.json
+data/query_cache.json
+app/__pycache__/

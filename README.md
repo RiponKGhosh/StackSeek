@@ -7,6 +7,7 @@ StackSeek is a semantic Stack Overflow search app built with Flask, FAISS, and G
 - Semantic search over Stack Overflow Q&A records
 - FAISS index for fast vector similarity lookup
 - Simple web UI (`/`) and JSON API (`/search`)
+- Persistent query cache to reduce repeated embedding calls (`data/query_cache.json`)
 
 ## Tech Stack
 
@@ -113,4 +114,3 @@ static/
   - Run `python app/dataset.py --output-dir data`.
 - Dependency install issues:
   - Verify Python version is 3.10+ and virtual environment is activated.
-
