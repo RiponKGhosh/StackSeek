@@ -1,0 +1,4 @@
+.venv
+.env
+data/*.faiss
+data/records.json

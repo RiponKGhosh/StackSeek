@@ -1,0 +1,254 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>StackSeek Results</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+  </head>
+  <body class="gradient-page">
+    <div class="bg-orb orb-1"></div>
+    <div class="bg-orb orb-2"></div>
+    <div class="bg-orb orb-3"></div>
+
+    <header class="results-header glass-panel reveal-up">
+      <a class="brand-link" href="{{ url_for('home') }}">StackSeek</a>
+      <form id="resultsSearchForm" class="search-shell compact" autocomplete="off">
+        <div class="search-input-wrap">
+          <svg class="search-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              d="M15.5 15.5L21 21M10.8 18a7.2 7.2 0 1 0 0-14.4 7.2 7.2 0 0 0 0 14.4Z"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+          <input id="resultsQuery" type="text" name="q" value="{{ query }}" required />
+        </div>
+        <button type="submit" class="gradient-btn">Search</button>
+      </form>
+    </header>
+
+    <main class="results-main">
+      <section id="statusLine" class="status-line"></section>
+
+      <section id="loadingState" class="loading-state glass-panel hidden">
+        <div class="spinner"></div>
+        <p>Finding the most relevant answers...</p>
+      </section>
+
+      <section id="resultsList" class="results-grid"></section>
+      <section id="emptyState" class="empty-state glass-panel hidden"></section>
+    </main>
+
+    <script>
+      const searchForm = document.getElementById("resultsSearchForm");
+      const queryInput = document.getElementById("resultsQuery");
+      const resultsList = document.getElementById("resultsList");
+      const loadingState = document.getElementById("loadingState");
+      const emptyState = document.getElementById("emptyState");
+      const statusLine = document.getElementById("statusLine");
+
+      function setLoading(isLoading) {
+        loadingState.classList.toggle("hidden", !isLoading);
+      }
+
+      function escapeHtml(value) {
+        return String(value)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/\"/g, "&quot;")
+          .replace(/'/g, "&#39;");
+      }
+
+      function sanitizeSnippetHtml(value) {
+        const allowedTags = new Set(["P", "BR", "PRE", "CODE", "STRONG", "EM", "UL", "OL", "LI", "A"]);
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(`<div>${value || ""}</div>`, "text/html");
+        const root = doc.body.firstElementChild;
+
+        function clean(node) {
+          if (node.nodeType === Node.TEXT_NODE) {
+            return;
+          }
+
+          if (node.nodeType !== Node.ELEMENT_NODE) {
+            node.remove();
+            return;
+          }
+
+          const tag = node.tagName;
+          if (!allowedTags.has(tag)) {
+            const parent = node.parentNode;
+            while (node.firstChild) {
+              parent.insertBefore(node.firstChild, node);
+            }
+            node.remove();
+            return;
+          }
+
+          if (tag === "A") {
+            const href = (node.getAttribute("href") || "").trim();
+            if (!href || href.toLowerCase().startsWith("javascript:")) {
+              node.removeAttribute("href");
+            } else {
+              node.setAttribute("target", "_blank");
+              node.setAttribute("rel", "noopener noreferrer");
+            }
+          }
+
+          [...node.attributes].forEach((attr) => {
+            if (tag === "A" && attr.name === "href") return;
+            if (tag === "A" && (attr.name === "target" || attr.name === "rel")) return;
+            node.removeAttribute(attr.name);
+          });
+
+          [...node.childNodes].forEach(clean);
+        }
+
+        [...root.childNodes].forEach(clean);
+        return root.innerHTML;
+      }
+
+      function textLengthFromHtml(value) {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(`<div>${value || ""}</div>`, "text/html");
+        return (doc.body.textContent || "").trim().length;
+      }
+
+      function toggleAnswer(button, index) {
+        const preview = document.getElementById(`snippet-preview-${index}`);
+        const full = document.getElementById(`snippet-full-${index}`);
+        if (!preview || !full) return;
+
+        const expanded = button.getAttribute("data-expanded") === "true";
+        if (expanded) {
+          preview.classList.remove("hidden");
+          full.classList.add("hidden");
+          button.textContent = "See more";
+          button.setAttribute("data-expanded", "false");
+        } else {
+          preview.classList.add("hidden");
+          full.classList.remove("hidden");
+          button.textContent = "See less";
+          button.setAttribute("data-expanded", "true");
+        }
+      }
+
+      function renderResults(query, results) {
+        statusLine.textContent = `${results.length} result${results.length === 1 ? "" : "s"} for "${query}"`;
+
+        if (!results.length) {
+          resultsList.innerHTML = "";
+          emptyState.textContent = "No relevant matches found. Try a clearer or shorter query.";
+          emptyState.classList.remove("hidden");
+          return;
+        }
+
+        emptyState.classList.add("hidden");
+        resultsList.innerHTML = results
+          .map((item, index) => {
+            const safeTitle = escapeHtml(item.title);
+            const safeSnippet = sanitizeSnippetHtml(item.snippet);
+            const safeFullAnswer = sanitizeSnippetHtml(item.full_answer || item.snippet || "");
+            const safeScore = Number(item.score).toFixed(4);
+            const matchedTerms = Array.isArray(item.matched_terms) ? item.matched_terms : [];
+            const safeMatchedTerms = matchedTerms.map((term) => `<span class="term-chip">${escapeHtml(term)}</span>`).join("");
+            const sourceUrl = item.source_url ? escapeHtml(item.source_url) : "";
+            const hasMore = textLengthFromHtml(safeFullAnswer) > textLengthFromHtml(safeSnippet) + 12;
+            const sourceTagHtml = sourceUrl
+              ? `<a class="tag tag-link" href="${sourceUrl}" target="_blank" rel="noopener noreferrer">Stack Overflow</a>`
+              : `<span class="tag">Stack Overflow</span>`;
+            return `
+              <article class="result-card fade-in" style="animation-delay:${Math.min(index * 70, 420)}ms">
+                <div class="result-head">
+                  <a href="#" onclick="return false;" class="result-title">${safeTitle}</a>
+                  <div class="head-meta">
+                    <div class="tag-row tag-row-top">
+                      <button class="tag tag-info" type="button" aria-label="Semantic match details">
+                        Semantic match
+                        <span class="semantic-popover" role="tooltip">
+                          <span class="popover-title">Why this matched</span>
+                          ${
+                            safeMatchedTerms
+                              ? `<span class="popover-text muted">Matched terms</span><span class="popover-terms">${safeMatchedTerms}</span>`
+                              : `<span class="popover-text muted">No direct keyword overlap detected.</span>`
+                          }
+                        </span>
+                      </button>
+                    </div>
+                    <span class="score-badge">Score ${safeScore}</span>
+                    ${sourceTagHtml}
+                  </div>
+                </div>
+                <div class="result-snippet result-snippet-preview" id="snippet-preview-${index}">${safeSnippet}</div>
+                <div class="result-snippet result-snippet-full hidden" id="snippet-full-${index}">${safeFullAnswer}</div>
+                ${
+                  hasMore
+                    ? `<button class="see-more-btn" type="button" data-expanded="false" onclick="toggleAnswer(this, ${index})">See more</button>`
+                    : ""
+                }
+              </article>
+            `;
+          })
+          .join("");
+      }
+
+      async function runSearch(query) {
+        resultsList.innerHTML = "";
+        emptyState.classList.add("hidden");
+        statusLine.textContent = "";
+        setLoading(true);
+
+        try {
+          const response = await fetch("{{ url_for('search_route') }}", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ query, top_k: 8 }),
+          });
+
+          const data = await response.json();
+          if (!response.ok) {
+            throw new Error(data.error || "Search failed");
+          }
+
+          renderResults(query, data.results);
+        } catch (error) {
+          emptyState.textContent = error.message;
+          emptyState.classList.remove("hidden");
+        } finally {
+          setLoading(false);
+        }
+      }
+
+      searchForm.addEventListener("submit", (event) => {
+        event.preventDefault();
+        const query = queryInput.value.trim();
+        if (!query) return;
+
+        const nextUrl = new URL(window.location.href);
+        nextUrl.searchParams.set("q", query);
+        window.history.replaceState({}, "", nextUrl);
+
+        runSearch(query);
+      });
+
+      const initialQuery = queryInput.value.trim();
+      if (initialQuery) {
+        runSearch(initialQuery);
+      } else {
+        emptyState.textContent = "Type a programming question to get started.";
+        emptyState.classList.remove("hidden");
+      }
+    </script>
+  </body>
+</html>

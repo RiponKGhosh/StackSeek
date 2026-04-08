@@ -1,0 +1,6 @@
+{
+  "embedding_model": "text-embedding-3-small",
+  "total_records": 4000,
+  "index_path": "data\\index.faiss",
+  "records_path": "data\\records.json"
+}

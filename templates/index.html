@@ -1,0 +1,50 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>StackSeek</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+  </head>
+  <body class="gradient-page home-page">
+    <div class="bg-orb orb-1"></div>
+    <div class="bg-orb orb-2"></div>
+    <div class="bg-orb orb-3"></div>
+
+    <main class="hero-wrap">
+      <section class="glass-panel hero-panel reveal-up">
+        <p class="eyebrow">StackSeek</p>
+        <h1>Search programming answers instantly</h1>
+
+        <form action="{{ url_for('results_page') }}" method="get" class="search-shell" autocomplete="off">
+          <div class="search-input-wrap">
+            <svg class="search-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M15.5 15.5L21 21M10.8 18a7.2 7.2 0 1 0 0-14.4 7.2 7.2 0 0 0 0 14.4Z"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.8"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+            <input
+              id="query"
+              type="text"
+              name="q"
+              placeholder="Try: how to declare array in python"
+              required
+            />
+          </div>
+          <button type="submit" class="gradient-btn">Search</button>
+        </form>
+      </section>
+    </main>
+  </body>
+</html>
